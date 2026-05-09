@@ -57,7 +57,7 @@ button {
 
 .login-panel,
 .person-panel,
-.detail-panel,
+detail-panel,
 .settlement-panel {
   border: 1px solid rgba(217, 225, 220, 0.9);
   background: rgba(255, 255, 255, 0.88);
@@ -171,7 +171,8 @@ button[type="submit"],
 
 button[type="submit"]:disabled,
 input:disabled,
-select:disabled {
+select:disabled,
+.person-picker-button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
 }
@@ -419,6 +420,119 @@ select:disabled {
   gap: 12px;
 }
 
+.label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.amount-help {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.amount-help::after {
+  content: attr(aria-label);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 8;
+  width: min(300px, 72vw);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(21, 32, 29, 0.14);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.amount-help:hover::after,
+.amount-help:focus::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.person-picker {
+  position: relative;
+}
+
+.person-picker-button {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 0 12px;
+  text-align: left;
+}
+
+.person-picker-button::after {
+  content: "⌄";
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.person-picker-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 10;
+  display: grid;
+  gap: 2px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 42px rgba(21, 32, 29, 0.18);
+}
+
+.person-option {
+  display: flex;
+  align-items: center;
+  grid-template-columns: none;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.person-option:hover {
+  background: var(--soft);
+}
+
+.person-option input {
+  width: 16px;
+  min-height: 16px;
+  accent-color: var(--green);
+}
+
 .detail-panel {
   display: grid;
   gap: 18px;
@@ -443,9 +557,10 @@ select:disabled {
 }
 
 .entry-card {
+  position: relative;
   display: grid;
   gap: 8px;
-  padding: 14px;
+  padding: 14px 14px 14px 46px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
@@ -458,9 +573,55 @@ select:disabled {
 .group-card summary {
   display: grid;
   gap: 8px;
-  padding: 14px;
+  padding: 14px 14px 14px 46px;
   cursor: pointer;
   list-style: none;
+}
+
+.entry-menu {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+}
+
+.menu-button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.entry-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: none;
+  min-width: 86px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(21, 32, 29, 0.16);
+}
+
+.entry-menu.open .entry-menu-panel {
+  display: block;
+}
+
+.entry-menu-panel button {
+  width: 100%;
+  min-height: 34px;
+  border-radius: 8px;
+  background: #fff1ef;
+  color: var(--red);
+  font-weight: 900;
 }
 
 .group-card summary::-webkit-details-marker {

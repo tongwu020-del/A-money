@@ -57,7 +57,7 @@ button {
 
 .login-panel,
 .person-panel,
-detail-panel,
+.detail-panel,
 .settlement-panel {
   border: 1px solid rgba(217, 225, 220, 0.9);
   background: rgba(255, 255, 255, 0.88);

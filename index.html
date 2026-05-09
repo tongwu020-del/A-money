@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A 钱器</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section id="loginView" class="login-view">
+        <div class="login-panel">
+          <div class="brand-row">
+            <div class="brand-mark" aria-hidden="true">A</div>
+            <div>
+              <h1>A 钱器</h1>
+              <p>旅行账目一次算清</p>
+            </div>
+          </div>
+
+          <form id="loginForm" class="login-form">
+            <label>
+              用户名
+              <select id="loginName" required></select>
+            </label>
+            <label>
+              密码
+              <input id="loginPassword" type="password" autocomplete="current-password" required />
+            </label>
+            <button type="submit">登录</button>
+            <p id="loginError" class="form-error" role="alert"></p>
+          </form>
+        </div>
+      </section>
+
+      <section id="dashboardView" class="dashboard-view hidden">
+        <header class="topbar">
+          <div class="topbar-title">
+            <div class="brand-mark small" aria-hidden="true">A</div>
+            <div>
+              <h1>A 钱器</h1>
+              <p id="currentUserText"></p>
+            </div>
+          </div>
+          <button id="logoutButton" class="ghost-button" type="button">退出</button>
+        </header>
+
+        <section class="summary-strip" aria-label="总览">
+          <div>
+            <span>总应收</span>
+            <strong id="totalReceivable">¥0.00</strong>
+          </div>
+          <div>
+            <span>总被收</span>
+            <strong id="totalPayable">¥0.00</strong>
+          </div>
+          <div>
+            <span>已记录</span>
+            <strong id="entryCount">0 笔</strong>
+          </div>
+        </section>
+
+        <nav id="userTabs" class="user-tabs" aria-label="成员卡片"></nav>
+
+        <section class="settlement-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>付款汇总</h2>
+              <p>按付款人筛选，自动抵消双方互相应付金额</p>
+            </div>
+            <div class="summary-controls">
+              <label class="compact-label">
+                类型
+                <select id="settlementMode">
+                  <option value="payable">应付</option>
+                  <option value="receivable">应收</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="settlement-total">
+            <span id="payerSummaryText">请选择付款人</span>
+            <strong id="payerTotal">¥0.00</strong>
+          </div>
+          <div id="settlementList" class="settlement-list"></div>
+        </section>
+
+        <section class="workspace-grid">
+          <article class="person-panel">
+            <div class="person-header">
+              <div>
+                <span class="eyebrow">当前卡片</span>
+                <h2 id="selectedUserName"></h2>
+              </div>
+              <div id="balanceBadge" class="balance-badge"></div>
+            </div>
+
+            <div class="metric-grid">
+              <div>
+                <span>TA 的应收额</span>
+                <strong id="selectedReceivable">¥0.00</strong>
+              </div>
+              <div>
+                <span>别人向 TA 收</span>
+                <strong id="selectedPayable">¥0.00</strong>
+              </div>
+              <div>
+                <span>Balance</span>
+                <strong id="selectedBalance">¥0.00</strong>
+              </div>
+            </div>
+
+            <form id="entryForm" class="entry-form">
+              <p id="entryNotice" class="entry-notice"></p>
+              <div class="form-row">
+                <label>
+                  To
+                  <select id="toUser" required></select>
+                </label>
+                <label>
+                  应收额
+                  <input id="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+                </label>
+              </div>
+              <label>
+                备注
+                <input id="note" type="text" maxlength="48" placeholder="例如：民宿、包车、门票" required />
+              </label>
+              <button type="submit">添加到此卡片</button>
+            </form>
+          </article>
+
+          <article class="detail-panel">
+            <div class="panel-heading">
+              <h2>明细</h2>
+            </div>
+
+            <div class="detail-columns">
+              <section>
+                <h3>应收明细</h3>
+                <div id="receivableList" class="entry-list"></div>
+              </section>
+              <section>
+                <h3>被收明细</h3>
+                <div id="payableList" class="entry-list"></div>
+              </section>
+            </div>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -2,6 +2,7 @@ const USERS = ["大鸟", "司徒", "alex", "老鹰", "梧桐", "皮老弟", "JC"
 const PASSWORDS = Object.fromEntries(USERS.map((name) => [name, "yyds8888"]));
 const STORAGE_KEY = "a-money-ledger-v1";
 const SESSION_KEY = "a-money-session-v1";
+const ALL_USERS_OPTION = "__ALL_USERS__";
 const WUTONG_BATCH_DATE = "2026-05-09 22:00";
 const SITOU_BATCH_DATE = "2026-05-09 22:20";
 
@@ -204,7 +205,49 @@ function getStats(userName) {
 }
 
 function populateSelect(selectElement, names) {
-  selectElement.innerHTML = names.map((name) => `<option value="${name}">${name}</option>`).join("");
+  selectElement.innerHTML = names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+}
+
+function populatePersonSelect(selectElement, names) {
+  const options = [
+    `<option value="${ALL_USERS_OPTION}">所有人</option>`,
+    ...names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`),
+  ];
+
+  selectElement.innerHTML = options.join("");
+}
+
+function getEntryGroupKey(entry) {
+  if (entry.groupId) return entry.groupId;
+
+  const seedOwnerPrefix = entry.id.startsWith("seed-wutong-") ? "seed-wutong-" : entry.id.startsWith("seed-sitou-") ? "seed-sitou-" : "";
+  if (seedOwnerPrefix && entry.id.endsWith(`-${entry.to}`)) {
+    return entry.id.slice(0, -entry.to.length - 1);
+  }
+
+  return `${entry.from}|${entry.note}|${entry.createdAt}`;
+}
+
+function groupEntriesByProject(entries) {
+  const groups = new Map();
+
+  entries.forEach((entry) => {
+    const groupKey = getEntryGroupKey(entry);
+    const current = groups.get(groupKey) || {
+      id: groupKey,
+      from: entry.from,
+      note: entry.note,
+      createdAt: entry.createdAt,
+      total: 0,
+      entries: [],
+    };
+
+    current.total += entry.amount;
+    current.entries.push(entry);
+    groups.set(groupKey, current);
+  });
+
+  return [...groups.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 function renderShell() {
@@ -222,7 +265,7 @@ function renderShell() {
 function renderTabs() {
   elements.userTabs.innerHTML = USERS.map((name) => {
     const activeClass = name === state.selectedUser ? "active" : "";
-    return `<button class="${activeClass}" type="button" data-user="${name}">${name}</button>`;
+    return `<button class="${activeClass}" type="button" data-user="${escapeHtml(name)}">${escapeHtml(name)}</button>`;
   }).join("");
 }
 
@@ -248,7 +291,7 @@ function renderDashboard() {
   elements.note.disabled = !canEditSelected;
   elements.entryForm.querySelector("button[type='submit']").disabled = !canEditSelected;
 
-  populateSelect(elements.toUser, toOptions);
+  populatePersonSelect(elements.toUser, toOptions);
   renderEntryLists();
   renderSettlementSummary();
 }
@@ -332,8 +375,43 @@ function renderEntryLists() {
   const receivables = state.entries.filter((entry) => entry.from === state.selectedUser);
   const payables = state.entries.filter((entry) => entry.to === state.selectedUser);
 
-  elements.receivableList.innerHTML = renderEntries(receivables, "to");
+  elements.receivableList.innerHTML = renderReceivableGroups(receivables);
   elements.payableList.innerHTML = renderEntries(payables, "from");
+}
+
+function renderReceivableGroups(entries) {
+  if (!entries.length) {
+    return `<div class="empty-state">暂无明细</div>`;
+  }
+
+  return groupEntriesByProject(entries).map((group) => {
+    const canDelete = state.currentUser === "梧桐";
+    const detailRows = group.entries
+      .sort((a, b) => a.to.localeCompare(b.to, "zh-CN"))
+      .map((entry) => `
+        <div class="group-detail-row">
+          <span>应收 ${escapeHtml(entry.to)}</span>
+          <strong>${formatCurrency(entry.amount)}</strong>
+        </div>
+      `)
+      .join("");
+
+    return `
+      <details class="entry-card group-card">
+        <summary>
+          <div class="entry-main">
+            <span>${escapeHtml(group.note)}</span>
+            <strong>${formatCurrency(group.total)}</strong>
+          </div>
+          <div class="entry-meta">
+            <span>${group.createdAt} · ${group.entries.length} 人</span>
+            ${canDelete ? `<button class="delete-button" type="button" data-delete-group="${escapeHtml(group.id)}" aria-label="删除">×</button>` : ""}
+          </div>
+        </summary>
+        <div class="group-details">${detailRows}</div>
+      </details>
+    `;
+  }).join("");
 }
 
 function renderEntries(entries, direction) {
@@ -388,15 +466,36 @@ function handleEntrySubmit(event) {
   const note = elements.note.value.trim();
 
   if (!amount || amount <= 0 || !note) return;
+  const selectedToUser = elements.toUser.value;
+  const createdAt = formatNow();
+  const groupId = createId();
 
-  state.entries.unshift({
-    id: createId(),
-    from: state.selectedUser,
-    to: elements.toUser.value,
-    amount,
-    note,
-    createdAt: formatNow(),
-  });
+  if (selectedToUser === ALL_USERS_OPTION) {
+    const perPersonAmount = amount / USERS.length;
+    const sharedEntries = USERS
+      .filter((name) => name !== state.selectedUser)
+      .map((name) => ({
+        id: createId(),
+        groupId,
+        from: state.selectedUser,
+        to: name,
+        amount: perPersonAmount,
+        note: `${note}（10人均分）`,
+        createdAt,
+      }));
+
+    state.entries.unshift(...sharedEntries);
+  } else {
+    state.entries.unshift({
+      id: createId(),
+      groupId,
+      from: state.selectedUser,
+      to: selectedToUser,
+      amount,
+      note,
+      createdAt,
+    });
+  }
 
   persistEntries();
   elements.entryForm.reset();
@@ -405,6 +504,12 @@ function handleEntrySubmit(event) {
 
 function deleteEntry(id) {
   state.entries = state.entries.filter((entry) => entry.id !== id);
+  persistEntries();
+  renderDashboard();
+}
+
+function deleteEntryGroup(groupId) {
+  state.entries = state.entries.filter((entry) => getEntryGroupKey(entry) !== groupId);
   persistEntries();
   renderDashboard();
 }
@@ -436,6 +541,13 @@ function wireEvents() {
     const button = event.target.closest("button[data-delete]");
     if (!button) return;
     deleteEntry(button.dataset.delete);
+  });
+
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-delete-group]");
+    if (!button) return;
+    event.preventDefault();
+    deleteEntryGroup(button.dataset.deleteGroup);
   });
 
 }

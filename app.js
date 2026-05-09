@@ -5,8 +5,16 @@ const SESSION_KEY = "a-money-session-v1";
 const ALL_USERS_OPTION = "__ALL_USERS__";
 const WUTONG_BATCH_DATE = "2026-05-09 22:00";
 const SITOU_BATCH_DATE = "2026-05-09 22:20";
+const EXTRA_BATCH_DATE = "2026-05-09 22:40";
 
-const seedEntries = [...buildWutongExpenseEntries(), ...buildSitouExpenseEntries()];
+const seedEntries = [
+  ...buildWutongExpenseEntries(),
+  ...buildSitouExpenseEntries(),
+  ...buildDaniaoExpenseEntries(),
+  ...buildLaoyingExpenseEntries(),
+  ...buildAlexExpenseEntries(),
+  ...buildPilaoExpenseEntries(),
+];
 
 let state = {
   currentUser: sessionStorage.getItem(SESSION_KEY) || "",
@@ -68,40 +76,51 @@ function escapeHtml(value) {
   });
 }
 
-function createSeedEntry(key, to, amount, note) {
+function getSeedPrefix(from) {
+  const prefixByUser = {
+    "梧桐": "wutong",
+    "司徒": "sitou",
+    "大鸟": "daniao",
+    "老鹰": "laoying",
+    "alex": "alex",
+    "皮老弟": "pilao",
+  };
+
+  return prefixByUser[from] || from;
+}
+
+function createOwnerSeedEntry(from, key, to, amount, note, createdAt) {
   return {
-    id: `seed-wutong-${key}-${to}`,
-    from: "梧桐",
+    id: `seed-${getSeedPrefix(from)}-${key}-${to}`,
+    from,
     to,
     amount,
     note,
-    createdAt: WUTONG_BATCH_DATE,
+    createdAt,
   };
+}
+
+function createOwnerSharedSeedEntries(from, key, total, note, createdAt) {
+  const perPersonAmount = total / USERS.length;
+  return USERS
+    .filter((name) => name !== from)
+    .map((name) => createOwnerSeedEntry(from, key, name, perPersonAmount, `${note}（10人均分）`, createdAt));
+}
+
+function createSeedEntry(key, to, amount, note) {
+  return createOwnerSeedEntry("梧桐", key, to, amount, note, WUTONG_BATCH_DATE);
 }
 
 function createSharedSeedEntries(key, total, note) {
-  const perPersonAmount = total / USERS.length;
-  return USERS
-    .filter((name) => name !== "梧桐")
-    .map((name) => createSeedEntry(key, name, perPersonAmount, `${note}（10人均分）`));
+  return createOwnerSharedSeedEntries("梧桐", key, total, note, WUTONG_BATCH_DATE);
 }
 
 function createSitouSeedEntry(key, to, amount, note) {
-  return {
-    id: `seed-sitou-${key}-${to}`,
-    from: "司徒",
-    to,
-    amount,
-    note,
-    createdAt: SITOU_BATCH_DATE,
-  };
+  return createOwnerSeedEntry("司徒", key, to, amount, note, SITOU_BATCH_DATE);
 }
 
 function createSitouSharedSeedEntries(key, total, note) {
-  const perPersonAmount = total / USERS.length;
-  return USERS
-    .filter((name) => name !== "司徒")
-    .map((name) => createSitouSeedEntry(key, name, perPersonAmount, `${note}（10人均分）`));
+  return createOwnerSharedSeedEntries("司徒", key, total, note, SITOU_BATCH_DATE);
 }
 
 function buildWutongExpenseEntries() {
@@ -131,9 +150,42 @@ function buildSitouExpenseEntries() {
     ...createSitouSharedSeedEntries("cash-900thb", 190, "900泰铢"),
   ];
 
-  const directEntries = ["秋旋", "毛老师", "皮老弟"].map((name) => createSitouSeedEntry("durian", name, 45, "榴莲"));
+  const directEntries = [
+    ...["秋旋", "毛老师", "皮老弟"].map((name) => createSitouSeedEntry("durian", name, 45, "榴莲")),
+    createSitouSeedEntry("cash-950thb", "大鸟", 200, "950泰铢"),
+    createSitouSeedEntry("cash-2090thb-25rmb", "皮老弟", 467, "2090泰铢 + 25rmb"),
+  ];
 
   return [...sharedEntries, ...directEntries];
+}
+
+function buildDaniaoExpenseEntries() {
+  return createOwnerSharedSeedEntries("大鸟", "internet-famous-restaurant", 895, "网红餐厅4240泰铢", EXTRA_BATCH_DATE);
+}
+
+function buildLaoyingExpenseEntries() {
+  return [
+    createOwnerSeedEntry("老鹰", "cash-100", "大鸟", 21, "100", EXTRA_BATCH_DATE),
+  ];
+}
+
+function buildAlexExpenseEntries() {
+  const sharedEntries = createOwnerSharedSeedEntries("alex", "seven-eleven", 1525, "711", EXTRA_BATCH_DATE);
+  const directEntries = [
+    ...["梧桐", "司徒", "大鸟"].map((name) => createOwnerSeedEntry("alex", "cash-800thb", name, 169, "800泰铢", EXTRA_BATCH_DATE)),
+    createOwnerSeedEntry("alex", "motorbike-1000thb", "老鹰", 211, "摩托1000泰铢", EXTRA_BATCH_DATE),
+    createOwnerSeedEntry("alex", "owed-200thb", "皮老弟", 42, "欠200泰铢", EXTRA_BATCH_DATE),
+  ];
+
+  return [...sharedEntries, ...directEntries];
+}
+
+function buildPilaoExpenseEntries() {
+  return [
+    createOwnerSeedEntry("皮老弟", "apple-pay", "大鸟", 156, "apple pay", EXTRA_BATCH_DATE),
+    ...["大鸟", "司徒"].map((name) => createOwnerSeedEntry("皮老弟", "alipay", name, 68, "alipay", EXTRA_BATCH_DATE)),
+    createOwnerSeedEntry("皮老弟", "laoying-47", "老鹰", 47, "未备注", EXTRA_BATCH_DATE),
+  ];
 }
 
 function mergeSeedEntries(entries) {

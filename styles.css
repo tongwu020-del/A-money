@@ -451,6 +451,56 @@ select:disabled {
   background: #fff;
 }
 
+.group-card {
+  padding: 0;
+}
+
+.group-card summary {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.group-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.group-card summary::after {
+  content: "展开明细";
+  width: fit-content;
+  color: var(--green-dark);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.group-card[open] summary::after {
+  content: "收起明细";
+}
+
+.group-details {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.group-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--soft);
+  font-size: 14px;
+}
+
+.group-detail-row strong {
+  color: var(--ink);
+  white-space: nowrap;
+}
+
 .entry-main {
   display: flex;
   justify-content: space-between;

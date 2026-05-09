@@ -12,6 +12,7 @@ let state = {
   currentUser: sessionStorage.getItem(SESSION_KEY) || "",
   selectedUser: sessionStorage.getItem(SESSION_KEY) || USERS[0],
   settlementMode: "payable",
+  selectedTargets: [ALL_USERS_OPTION],
   entries: loadEntries(),
 };
 
@@ -39,7 +40,8 @@ const elements = {
   selectedBalance: document.querySelector("#selectedBalance"),
   entryForm: document.querySelector("#entryForm"),
   entryNotice: document.querySelector("#entryNotice"),
-  toUser: document.querySelector("#toUser"),
+  personPickerButton: document.querySelector("#personPickerButton"),
+  personPickerPanel: document.querySelector("#personPickerPanel"),
   amount: document.querySelector("#amount"),
   note: document.querySelector("#note"),
   receivableList: document.querySelector("#receivableList"),
@@ -208,15 +210,6 @@ function populateSelect(selectElement, names) {
   selectElement.innerHTML = names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
 }
 
-function populatePersonSelect(selectElement, names) {
-  const options = [
-    `<option value="${ALL_USERS_OPTION}">所有人</option>`,
-    ...names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`),
-  ];
-
-  selectElement.innerHTML = options.join("");
-}
-
 function getEntryGroupKey(entry) {
   if (entry.groupId) return entry.groupId;
 
@@ -226,6 +219,54 @@ function getEntryGroupKey(entry) {
   }
 
   return `${entry.from}|${entry.note}|${entry.createdAt}`;
+}
+
+function normalizeSelectedTargets(selectableTargets) {
+  if (state.selectedTargets.includes(ALL_USERS_OPTION)) {
+    state.selectedTargets = [ALL_USERS_OPTION];
+    return;
+  }
+
+  state.selectedTargets = state.selectedTargets.filter((name) => selectableTargets.includes(name));
+  if (!state.selectedTargets.length) {
+    state.selectedTargets = [ALL_USERS_OPTION];
+  }
+}
+
+function getActiveTargets() {
+  const selectableTargets = USERS.filter((name) => name !== state.selectedUser);
+  if (state.selectedTargets.includes(ALL_USERS_OPTION)) return selectableTargets;
+  return state.selectedTargets.filter((name) => selectableTargets.includes(name));
+}
+
+function renderPersonPicker(selectableTargets) {
+  normalizeSelectedTargets(selectableTargets);
+
+  const selectedTargets = getActiveTargets();
+  const buttonText = state.selectedTargets.includes(ALL_USERS_OPTION)
+    ? "所有人"
+    : selectedTargets.length <= 2
+      ? selectedTargets.join("、")
+      : `${selectedTargets.slice(0, 2).join("、")} 等 ${selectedTargets.length} 人`;
+  const allChecked = state.selectedTargets.includes(ALL_USERS_OPTION) ? "checked" : "";
+  const targetOptions = selectableTargets.map((name) => {
+    const checked = state.selectedTargets.includes(name) ? "checked" : "";
+    return `
+      <label class="person-option">
+        <input type="checkbox" value="${escapeHtml(name)}" ${checked} />
+        <span>${escapeHtml(name)}</span>
+      </label>
+    `;
+  }).join("");
+
+  elements.personPickerButton.textContent = buttonText;
+  elements.personPickerPanel.innerHTML = `
+    <label class="person-option">
+      <input type="checkbox" value="${ALL_USERS_OPTION}" ${allChecked} />
+      <span>所有人</span>
+    </label>
+    ${targetOptions}
+  `;
 }
 
 function groupEntriesByProject(entries) {
@@ -265,7 +306,7 @@ function renderShell() {
 function renderTabs() {
   elements.userTabs.innerHTML = USERS.map((name) => {
     const activeClass = name === state.selectedUser ? "active" : "";
-    return `<button class="${activeClass}" type="button" data-user="${escapeHtml(name)}">${escapeHtml(name)}</button>`;
+    return `<button class="${activeClass}" type="button" data-user="${name}">${name}</button>`;
   }).join("");
 }
 
@@ -286,12 +327,12 @@ function renderDashboard() {
   elements.balanceBadge.textContent = selected.balance >= 0 ? "净应收" : "净应付";
   elements.balanceBadge.classList.toggle("negative", selected.balance < 0);
   elements.entryNotice.textContent = canEditSelected ? "" : "当前为查看模式，只有梧桐可以修改明细数据。";
-  elements.toUser.disabled = !canEditSelected;
+  elements.personPickerButton.disabled = !canEditSelected;
   elements.amount.disabled = !canEditSelected;
   elements.note.disabled = !canEditSelected;
   elements.entryForm.querySelector("button[type='submit']").disabled = !canEditSelected;
 
-  populatePersonSelect(elements.toUser, toOptions);
+  renderPersonPicker(toOptions);
   renderEntryLists();
   renderSettlementSummary();
 }
@@ -405,7 +446,7 @@ function renderReceivableGroups(entries) {
           </div>
           <div class="entry-meta">
             <span>${group.createdAt} · ${group.entries.length} 人</span>
-            ${canDelete ? `<button class="delete-button" type="button" data-delete-group="${escapeHtml(group.id)}" aria-label="删除">×</button>` : ""}
+            ${canDelete ? renderActionMenu({ groupId: group.id }) : ""}
           </div>
         </summary>
         <div class="group-details">${detailRows}</div>
@@ -425,6 +466,7 @@ function renderEntries(entries, direction) {
 
     return `
       <article class="entry-card">
+        ${canDelete ? renderActionMenu({ entryId: entry.id }) : ""}
         <div class="entry-main">
           <span>${counterpart}</span>
           <strong>${formatCurrency(entry.amount)}</strong>
@@ -432,11 +474,25 @@ function renderEntries(entries, direction) {
         <div>${escapeHtml(entry.note)}</div>
         <div class="entry-meta">
           <span>${entry.createdAt}</span>
-          ${canDelete ? `<button class="delete-button" type="button" data-delete="${entry.id}" aria-label="删除">×</button>` : ""}
         </div>
       </article>
     `;
   }).join("");
+}
+
+function renderActionMenu({ entryId = "", groupId = "" }) {
+  const deleteAttribute = groupId
+    ? `data-delete-group="${escapeHtml(groupId)}"`
+    : `data-delete="${escapeHtml(entryId)}"`;
+
+  return `
+    <div class="entry-menu">
+      <button class="menu-button" type="button" data-menu-button aria-label="更多操作">...</button>
+      <div class="entry-menu-panel">
+        <button type="button" ${deleteAttribute}>删除</button>
+      </div>
+    </div>
+  `;
 }
 
 function handleLogin(event) {
@@ -466,21 +522,24 @@ function handleEntrySubmit(event) {
   const note = elements.note.value.trim();
 
   if (!amount || amount <= 0 || !note) return;
-  const selectedToUser = elements.toUser.value;
+  const selectedTargets = getActiveTargets();
+  if (!selectedTargets.length) return;
+
   const createdAt = formatNow();
   const groupId = createId();
 
-  if (selectedToUser === ALL_USERS_OPTION) {
-    const perPersonAmount = amount / USERS.length;
-    const sharedEntries = USERS
-      .filter((name) => name !== state.selectedUser)
+  if (state.selectedTargets.includes(ALL_USERS_OPTION) || selectedTargets.length > 1) {
+    const splitCount = state.selectedTargets.includes(ALL_USERS_OPTION) ? USERS.length : selectedTargets.length + 1;
+    const perPersonAmount = amount / splitCount;
+    const sharedNote = `${note}（${splitCount}人均分）`;
+    const sharedEntries = selectedTargets
       .map((name) => ({
         id: createId(),
         groupId,
         from: state.selectedUser,
         to: name,
         amount: perPersonAmount,
-        note: `${note}（10人均分）`,
+        note: sharedNote,
         createdAt,
       }));
 
@@ -490,7 +549,7 @@ function handleEntrySubmit(event) {
       id: createId(),
       groupId,
       from: state.selectedUser,
-      to: selectedToUser,
+      to: selectedTargets[0],
       amount,
       note,
       createdAt,
@@ -499,6 +558,7 @@ function handleEntrySubmit(event) {
 
   persistEntries();
   elements.entryForm.reset();
+  state.selectedTargets = [ALL_USERS_OPTION];
   renderDashboard();
 }
 
@@ -535,11 +595,55 @@ function wireEvents() {
     renderSettlementSummary();
   });
 
+  elements.personPickerButton.addEventListener("click", () => {
+    const isOpen = !elements.personPickerPanel.classList.contains("hidden");
+    elements.personPickerPanel.classList.toggle("hidden", isOpen);
+    elements.personPickerButton.setAttribute("aria-expanded", String(!isOpen));
+  });
+
+  elements.personPickerPanel.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("input[type='checkbox']");
+    if (!checkbox) return;
+
+    if (checkbox.value === ALL_USERS_OPTION) {
+      state.selectedTargets = [ALL_USERS_OPTION];
+      renderDashboard();
+      return;
+    }
+
+    const selected = [...elements.personPickerPanel.querySelectorAll("input[type='checkbox']:checked")]
+      .map((input) => input.value)
+      .filter((value) => value !== ALL_USERS_OPTION);
+    state.selectedTargets = selected.length ? selected : [ALL_USERS_OPTION];
+    renderDashboard();
+  });
+
   elements.entryForm.addEventListener("submit", handleEntrySubmit);
+
+  document.addEventListener("click", (event) => {
+    if (event.target.closest(".person-picker")) return;
+    elements.personPickerPanel.classList.add("hidden");
+    elements.personPickerButton.setAttribute("aria-expanded", "false");
+  });
+
+  document.addEventListener("click", (event) => {
+    const menuButton = event.target.closest("button[data-menu-button]");
+    if (!menuButton) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const menu = menuButton.closest(".entry-menu");
+    document.querySelectorAll(".entry-menu.open").forEach((item) => {
+      if (item !== menu) item.classList.remove("open");
+    });
+    menu.classList.toggle("open");
+  });
 
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-delete]");
     if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    document.querySelectorAll(".entry-menu.open").forEach((item) => item.classList.remove("open"));
     deleteEntry(button.dataset.delete);
   });
 
@@ -547,7 +651,14 @@ function wireEvents() {
     const button = event.target.closest("button[data-delete-group]");
     if (!button) return;
     event.preventDefault();
+    event.stopPropagation();
+    document.querySelectorAll(".entry-menu.open").forEach((item) => item.classList.remove("open"));
     deleteEntryGroup(button.dataset.deleteGroup);
+  });
+
+  document.addEventListener("click", (event) => {
+    if (event.target.closest(".entry-menu")) return;
+    document.querySelectorAll(".entry-menu.open").forEach((item) => item.classList.remove("open"));
   });
 
 }

@@ -115,10 +115,16 @@
               <div class="form-row">
                 <label>
                   人员
-                  <select id="toUser" required></select>
+                  <div class="person-picker">
+                    <button id="personPickerButton" class="person-picker-button" type="button" aria-expanded="false"></button>
+                    <div id="personPickerPanel" class="person-picker-panel hidden"></div>
+                  </div>
                 </label>
                 <label>
-                  应收额
+                  <span class="label-row">
+                    应收额
+                    <span class="amount-help" tabindex="0" aria-label="多选或选择所有人时，请填入项目总金额，系统会自动按选择人数加自己一起均分。">!</span>
+                  </span>
                   <input id="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
                 </label>
               </div>

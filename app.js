@@ -2,6 +2,8 @@ const USERS = ["大鸟", "司徒", "alex", "老鹰", "梧桐", "皮老弟", "JC"
 const PASSWORDS = Object.fromEntries(USERS.map((name) => [name, "yyds8888"]));
 const STORAGE_KEY = "a-money-ledger-v1";
 const SESSION_KEY = "a-money-session-v1";
+const SEED_VERSION_KEY = "a-money-seed-version-v1";
+const SEED_VERSION = "2026-05-09-02";
 const ALL_USERS_OPTION = "__ALL_USERS__";
 const WUTONG_BATCH_DATE = "2026-05-09 22:00";
 const SITOU_BATCH_DATE = "2026-05-09 22:20";
@@ -131,7 +133,7 @@ function buildWutongExpenseEntries() {
   ];
 
   const directEntries = [
-    createSeedEntry("taxi-airport", "老鹰", 225, "打车去机场"),
+    createSeedEntry("taxi-airport", "老鹰", 47.5, "打车去机场"),
     createSeedEntry("cash-2000thb", "大鸟", 422, "现金2000泰铢"),
     createSeedEntry("cash-1000thb", "司徒", 211, "现金1000泰铢"),
     createSeedEntry("nana-drinks", "alex", 257, "NaNa drink+lady drink"),
@@ -147,7 +149,6 @@ function buildSitouExpenseEntries() {
   const sharedEntries = [
     ...createSitouSharedSeedEntries("cash-2800thb", 591, "2800泰铢"),
     ...createSitouSharedSeedEntries("seaside-restaurant", 650, "海边餐厅"),
-    ...createSitouSharedSeedEntries("cash-900thb", 190, "900泰铢"),
   ];
 
   const directEntries = [
@@ -182,8 +183,8 @@ function buildAlexExpenseEntries() {
 
 function buildPilaoExpenseEntries() {
   return [
-    createOwnerSeedEntry("皮老弟", "apple-pay", "大鸟", 156, "apple pay", EXTRA_BATCH_DATE),
-    ...["大鸟", "司徒"].map((name) => createOwnerSeedEntry("皮老弟", "alipay", name, 68, "alipay", EXTRA_BATCH_DATE)),
+    createOwnerSeedEntry("皮老弟", "apple-pay", "大鸟", 78, "apple pay", EXTRA_BATCH_DATE),
+    ...["大鸟", "司徒"].map((name) => createOwnerSeedEntry("皮老弟", "alipay", name, 45, "alipay", EXTRA_BATCH_DATE)),
     createOwnerSeedEntry("皮老弟", "laoying-47", "老鹰", 47, "未备注", EXTRA_BATCH_DATE),
   ];
 }
@@ -201,14 +202,24 @@ function mergeSeedEntries(entries) {
     return entry;
   });
   const existingIds = new Set(migratedEntries.map((entry) => entry.id));
+  const savedSeedEntries = migratedEntries.filter((entry) => entry.id.startsWith("seed-"));
+  const customEntries = migratedEntries.filter((entry) => !entry.id.startsWith("seed-"));
+  const seedVersion = localStorage.getItem(SEED_VERSION_KEY);
+
+  if (seedVersion !== SEED_VERSION) {
+    localStorage.setItem(SEED_VERSION_KEY, SEED_VERSION);
+    return [...seedEntries, ...customEntries];
+  }
+
   const missingSeedEntries = seedEntries.filter((entry) => !existingIds.has(entry.id));
-  return [...missingSeedEntries, ...migratedEntries];
+  return [...missingSeedEntries, ...savedSeedEntries, ...customEntries];
 }
 
 function loadEntries() {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (!saved) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(seedEntries));
+    localStorage.setItem(SEED_VERSION_KEY, SEED_VERSION);
     return seedEntries;
   }
 

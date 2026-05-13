@@ -3,7 +3,7 @@ const PASSWORDS = Object.fromEntries(USERS.map((name) => [name, "yyds8888"]));
 const STORAGE_KEY = "a-money-ledger-v1";
 const SESSION_KEY = "a-money-session-v1";
 const SEED_VERSION_KEY = "a-money-seed-version-v1";
-const SEED_VERSION = "2026-05-10-02";
+const SEED_VERSION = "2026-05-13-01";
 const ALL_USERS_OPTION = "__ALL_USERS__";
 const WUTONG_BATCH_DATE = "2026-05-09 22:00";
 const SITOU_BATCH_DATE = "2026-05-09 22:20";
@@ -140,6 +140,7 @@ function buildWutongExpenseEntries() {
     ...["大鸟", "叶婷", "司徒", "秋旋"].map((name) => createSeedEntry("nana-72", name, 72, "NaNa")),
     ...["JC", "毛老师"].map((name) => createSeedEntry("nana-lady-chivas", name, 282, "NaNa+lady drink+chivas")),
     ...["老鹰", "皮老弟"].map((name) => createSeedEntry("nana-situ-happy-split", name, 1407, "NaNa dirnk+司徒 happy")),
+    ...USERS.filter((name) => name !== "梧桐").map((name) => createSeedEntry("cash-withdrawal-fee-fx", name, 60, "大额取现手续费/汇率差")),
   ];
 
   return [...sharedEntries, ...directEntries];
@@ -190,8 +191,7 @@ function buildPilaoExpenseEntries() {
     ...["大鸟", "司徒"].map((name) => createOwnerSeedEntry("皮老弟", "alipay", name, 45, "alipay", EXTRA_BATCH_DATE)),
     createOwnerSeedEntry("皮老弟", "laoying-47", "老鹰", 47, "未备注", EXTRA_BATCH_DATE),
   ];
-}
-
+}\n
 function mergeSeedEntries(entries) {
   const migratedEntries = entries.map((entry) => {
     if (entry.id === "seed-wutong-nana-situ-happy-split-老鹰" || entry.id === "seed-wutong-nana-situ-happy-split-皮老弟") {

@@ -191,7 +191,8 @@ function buildPilaoExpenseEntries() {
     ...["大鸟", "司徒"].map((name) => createOwnerSeedEntry("皮老弟", "alipay", name, 45, "alipay", EXTRA_BATCH_DATE)),
     createOwnerSeedEntry("皮老弟", "laoying-47", "老鹰", 47, "未备注", EXTRA_BATCH_DATE),
   ];
-}\n
+}
+
 function mergeSeedEntries(entries) {
   const migratedEntries = entries.map((entry) => {
     if (entry.id === "seed-wutong-nana-situ-happy-split-老鹰" || entry.id === "seed-wutong-nana-situ-happy-split-皮老弟") {

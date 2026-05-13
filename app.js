@@ -3,7 +3,7 @@ const PASSWORDS = Object.fromEntries(USERS.map((name) => [name, "yyds8888"]));
 const STORAGE_KEY = "a-money-ledger-v1";
 const SESSION_KEY = "a-money-session-v1";
 const SEED_VERSION_KEY = "a-money-seed-version-v1";
-const SEED_VERSION = "2026-05-13-01";
+const SEED_VERSION = "2026-05-13-02";
 const ALL_USERS_OPTION = "__ALL_USERS__";
 const WUTONG_BATCH_DATE = "2026-05-09 22:00";
 const SITOU_BATCH_DATE = "2026-05-09 22:20";
@@ -168,7 +168,9 @@ function buildDaniaoExpenseEntries() {
 function buildLaoyingExpenseEntries() {
   return [
     ...createOwnerSharedSeedEntries("老鹰", "chartered-car", 2824, "包车", EXTRA_BATCH_DATE),
-    ...createOwnerSharedSeedEntries("老鹰", "chartered-boat", 2534, "包船", EXTRA_BATCH_DATE),
+    ...USERS
+      .filter((name) => !["老鹰", "alex", "JC"].includes(name))
+      .map((name) => createOwnerSeedEntry("老鹰", "chartered-boat-8-people", name, 316.75, "包船（8人均分）", EXTRA_BATCH_DATE)),
     ...["皮老弟", "司徒"].map((name) => createOwnerSeedEntry("老鹰", "meal-820thb", name, 43, "820泰铢一顿饭", EXTRA_BATCH_DATE)),
     createOwnerSeedEntry("老鹰", "cash-100", "大鸟", 21, "100", EXTRA_BATCH_DATE),
   ];

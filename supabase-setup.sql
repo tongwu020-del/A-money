@@ -11,6 +11,9 @@ create table if not exists public.ledger_entries (
   inserted_at timestamptz not null default now()
 );
 
+-- 新一轮账本从空账开始；如果表里已有旧数据，运行本脚本会清空。
+truncate table public.ledger_entries;
+
 alter table public.ledger_entries enable row level security;
 
 drop policy if exists "ledger read" on public.ledger_entries;

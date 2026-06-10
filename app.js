@@ -3,7 +3,10 @@ const PASSWORDS = Object.fromEntries(USERS.map((name) => [name, "yyds8888"]));
 const STORAGE_KEY = "a-money-ledger-v1";
 const SESSION_KEY = "a-money-session-v1";
 const SEED_VERSION_KEY = "a-money-seed-version-v1";
-const SEED_VERSION = "2026-05-13-02";
+const SEED_VERSION = "2026-06-10-01";
+const SUPABASE_URL = "https://hmkiwtfqfzamkkexqaxj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_jClQ8KfdvksZfP7tmeUg9w_cVaC9geU";
+const LEDGER_TABLE = "ledger_entries";
 const ALL_USERS_OPTION = "__ALL_USERS__";
 const WUTONG_BATCH_DATE = "2026-05-09 22:00";
 const SITOU_BATCH_DATE = "2026-05-09 22:20";
@@ -24,7 +27,12 @@ let state = {
   settlementMode: "payable",
   selectedTargets: [ALL_USERS_OPTION],
   entries: loadEntries(),
+  syncStatus: "正在连接云端数据...",
 };
+
+const supabaseClient = globalThis.supabase
+  ? globalThis.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
 
 const elements = {
   loginView: document.querySelector("#loginView"),
@@ -245,6 +253,99 @@ function persistEntries() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
 }
 
+function toDbEntry(entry, createdBy = state.currentUser || entry.from) {
+  return {
+    id: entry.id,
+    group_id: entry.groupId || null,
+    payer: entry.from,
+    debtor: entry.to,
+    amount: entry.amount,
+    note: entry.note,
+    entry_created_at: entry.createdAt,
+    created_by: entry.createdBy || createdBy,
+    is_seed: entry.id.startsWith("seed-"),
+  };
+}
+
+function fromDbEntry(row) {
+  return {
+    id: row.id,
+    groupId: row.group_id || undefined,
+    from: row.payer,
+    to: row.debtor,
+    amount: Number(row.amount),
+    note: row.note,
+    createdAt: row.entry_created_at,
+    createdBy: row.created_by,
+  };
+}
+
+function sortEntries(entries) {
+  return [...entries].sort((a, b) => {
+    const timeCompare = b.createdAt.localeCompare(a.createdAt);
+    if (timeCompare !== 0) return timeCompare;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+async function seedRemoteEntriesIfEmpty() {
+  if (!supabaseClient) return;
+
+  const { count, error: countError } = await supabaseClient
+    .from(LEDGER_TABLE)
+    .select("id", { count: "exact", head: true });
+
+  if (countError) throw countError;
+  if (count && count > 0) return;
+
+  const { error: seedError } = await supabaseClient
+    .from(LEDGER_TABLE)
+    .upsert(seedEntries.map((entry) => toDbEntry(entry, "system")), { onConflict: "id" });
+
+  if (seedError) throw seedError;
+}
+
+async function loadRemoteEntries() {
+  if (!supabaseClient) {
+    state.syncStatus = "未连接云端，当前使用本机数据。";
+    renderShell();
+    return;
+  }
+
+  try {
+    await seedRemoteEntriesIfEmpty();
+    const { data, error } = await supabaseClient
+      .from(LEDGER_TABLE)
+      .select("*")
+      .order("entry_created_at", { ascending: false })
+      .order("inserted_at", { ascending: false });
+
+    if (error) throw error;
+
+    state.entries = sortEntries((data || []).map(fromDbEntry));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
+    localStorage.setItem(SEED_VERSION_KEY, SEED_VERSION);
+    state.syncStatus = "云端数据已同步。";
+  } catch (error) {
+    console.error(error);
+    state.entries = loadEntries();
+    state.syncStatus = "云端同步失败，当前显示本机缓存。";
+  }
+
+  renderShell();
+}
+
+function subscribeRemoteEntries() {
+  if (!supabaseClient) return;
+
+  supabaseClient
+    .channel("ledger_entries_changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: LEDGER_TABLE }, () => {
+      loadRemoteEntries();
+    })
+    .subscribe();
+}
+
 function formatCurrency(value) {
   return new Intl.NumberFormat("zh-CN", {
     style: "currency",
@@ -395,7 +496,7 @@ function renderDashboard() {
   elements.selectedBalance.textContent = formatCurrency(selected.balance);
   elements.balanceBadge.textContent = selected.balance >= 0 ? "净应收" : "净应付";
   elements.balanceBadge.classList.toggle("negative", selected.balance < 0);
-  elements.entryNotice.textContent = canEditSelected ? "" : "当前为查看模式，只有梧桐可以修改明细数据。";
+  elements.entryNotice.textContent = canEditSelected ? state.syncStatus : `当前为查看模式，只有梧桐可以修改明细数据。${state.syncStatus}`;
   elements.personPickerButton.disabled = !canEditSelected;
   elements.amount.disabled = !canEditSelected;
   elements.note.disabled = !canEditSelected;
@@ -582,7 +683,7 @@ function handleLogin(event) {
   renderShell();
 }
 
-function handleEntrySubmit(event) {
+async function handleEntrySubmit(event) {
   event.preventDefault();
 
   if (state.currentUser !== "梧桐") return;
@@ -597,11 +698,13 @@ function handleEntrySubmit(event) {
   const createdAt = formatNow();
   const groupId = createId();
 
+  let newEntries;
+
   if (state.selectedTargets.includes(ALL_USERS_OPTION) || selectedTargets.length > 1) {
     const splitCount = state.selectedTargets.includes(ALL_USERS_OPTION) ? USERS.length : selectedTargets.length + 1;
     const perPersonAmount = amount / splitCount;
     const sharedNote = `${note}（${splitCount}人均分）`;
-    const sharedEntries = selectedTargets
+    newEntries = selectedTargets
       .map((name) => ({
         id: createId(),
         groupId,
@@ -611,10 +714,8 @@ function handleEntrySubmit(event) {
         note: sharedNote,
         createdAt,
       }));
-
-    state.entries.unshift(...sharedEntries);
   } else {
-    state.entries.unshift({
+    newEntries = [{
       id: createId(),
       groupId,
       from: state.selectedUser,
@@ -622,23 +723,57 @@ function handleEntrySubmit(event) {
       amount,
       note,
       createdAt,
-    });
+    }];
   }
 
+  if (supabaseClient) {
+    const { error } = await supabaseClient
+      .from(LEDGER_TABLE)
+      .insert(newEntries.map((entry) => toDbEntry(entry)));
+
+    if (error) {
+      elements.entryNotice.textContent = `新增失败：${error.message}`;
+      return;
+    }
+  }
+
+  state.entries.unshift(...newEntries);
   persistEntries();
   elements.entryForm.reset();
   state.selectedTargets = [ALL_USERS_OPTION];
   renderDashboard();
 }
 
-function deleteEntry(id) {
+async function deleteEntry(id) {
+  if (supabaseClient) {
+    const { error } = await supabaseClient.from(LEDGER_TABLE).delete().eq("id", id);
+    if (error) {
+      state.syncStatus = `删除失败：${error.message}`;
+      renderDashboard();
+      return;
+    }
+  }
+
   state.entries = state.entries.filter((entry) => entry.id !== id);
   persistEntries();
   renderDashboard();
 }
 
-function deleteEntryGroup(groupId) {
-  state.entries = state.entries.filter((entry) => getEntryGroupKey(entry) !== groupId);
+async function deleteEntryGroup(groupId) {
+  const entryIds = state.entries
+    .filter((entry) => getEntryGroupKey(entry) === groupId)
+    .map((entry) => entry.id);
+
+  if (supabaseClient && entryIds.length) {
+    const { error } = await supabaseClient.from(LEDGER_TABLE).delete().in("id", entryIds);
+    if (error) {
+      state.syncStatus = `删除失败：${error.message}`;
+      renderDashboard();
+      return;
+    }
+  }
+
+  state.entries = state.entries.filter((entry) => !entryIds.includes(entry.id));
   persistEntries();
   renderDashboard();
 }
@@ -732,6 +867,12 @@ function wireEvents() {
 
 }
 
-populateSelect(elements.loginName, USERS);
-wireEvents();
-renderShell();
+async function initializeApp() {
+  populateSelect(elements.loginName, USERS);
+  wireEvents();
+  renderShell();
+  await loadRemoteEntries();
+  subscribeRemoteEntries();
+}
+
+initializeApp();

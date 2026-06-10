@@ -1,9 +1,9 @@
-const USERS = ["大鸟", "司徒", "alex", "老鹰", "梧桐", "皮老弟", "JC", "秋旋", "叶婷", "毛老师"];
+const USERS = ["大鸟", "司徒", "alex", "老鹰", "梧桐", "皮老弟", "补位选手", "秋旋", "叶婷", "毛老师"];
 const PASSWORDS = Object.fromEntries(USERS.map((name) => [name, "yyds8888"]));
 const STORAGE_KEY = "a-money-ledger-v1";
 const SESSION_KEY = "a-money-session-v1";
 const SEED_VERSION_KEY = "a-money-seed-version-v1";
-const SEED_VERSION = "2026-06-10-01";
+const SEED_VERSION = "2026-06-10-02";
 const SUPABASE_URL = "https://hmkiwtfqfzamkkexqaxj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_jClQ8KfdvksZfP7tmeUg9w_cVaC9geU";
 const LEDGER_TABLE = "ledger_entries";
@@ -12,14 +12,7 @@ const WUTONG_BATCH_DATE = "2026-05-09 22:00";
 const SITOU_BATCH_DATE = "2026-05-09 22:20";
 const EXTRA_BATCH_DATE = "2026-05-09 22:40";
 
-const seedEntries = [
-  ...buildWutongExpenseEntries(),
-  ...buildSitouExpenseEntries(),
-  ...buildDaniaoExpenseEntries(),
-  ...buildLaoyingExpenseEntries(),
-  ...buildAlexExpenseEntries(),
-  ...buildPilaoExpenseEntries(),
-];
+const seedEntries = [];
 
 let state = {
   currentUser: sessionStorage.getItem(SESSION_KEY) || "",
@@ -146,7 +139,7 @@ function buildWutongExpenseEntries() {
     createSeedEntry("cash-1000thb", "司徒", 211, "现金1000泰铢"),
     createSeedEntry("nana-drinks", "alex", 257, "NaNa drink+lady drink"),
     ...["大鸟", "叶婷", "司徒", "秋旋"].map((name) => createSeedEntry("nana-72", name, 72, "NaNa")),
-    ...["JC", "毛老师"].map((name) => createSeedEntry("nana-lady-chivas", name, 282, "NaNa+lady drink+chivas")),
+    ...["补位选手", "毛老师"].map((name) => createSeedEntry("nana-lady-chivas", name, 282, "NaNa+lady drink+chivas")),
     ...["老鹰", "皮老弟"].map((name) => createSeedEntry("nana-situ-happy-split", name, 1407, "NaNa dirnk+司徒 happy")),
     ...USERS.filter((name) => name !== "梧桐").map((name) => createSeedEntry("cash-withdrawal-fee-fx", name, 60, "大额取现手续费/汇率差")),
   ];
@@ -177,7 +170,7 @@ function buildLaoyingExpenseEntries() {
   return [
     ...createOwnerSharedSeedEntries("老鹰", "chartered-car", 2824, "包车", EXTRA_BATCH_DATE),
     ...USERS
-      .filter((name) => !["老鹰", "alex", "JC"].includes(name))
+      .filter((name) => !["老鹰", "alex", "补位选手"].includes(name))
       .map((name) => createOwnerSeedEntry("老鹰", "chartered-boat-8-people", name, 316.75, "包船（8人均分）", EXTRA_BATCH_DATE)),
     ...["皮老弟", "司徒"].map((name) => createOwnerSeedEntry("老鹰", "meal-820thb", name, 43, "820泰铢一顿饭", EXTRA_BATCH_DATE)),
     createOwnerSeedEntry("老鹰", "cash-100", "大鸟", 21, "100", EXTRA_BATCH_DATE),
@@ -222,7 +215,7 @@ function mergeSeedEntries(entries) {
 
   if (seedVersion !== SEED_VERSION) {
     localStorage.setItem(SEED_VERSION_KEY, SEED_VERSION);
-    return [...seedEntries, ...customEntries];
+    return seedEntries;
   }
 
   const missingSeedEntries = seedEntries.filter((entry) => !existingIds.has(entry.id));
@@ -297,6 +290,7 @@ async function seedRemoteEntriesIfEmpty() {
 
   if (countError) throw countError;
   if (count && count > 0) return;
+  if (!seedEntries.length) return;
 
   const { error: seedError } = await supabaseClient
     .from(LEDGER_TABLE)
@@ -485,7 +479,7 @@ function renderDashboard() {
   const totalReceivable = state.entries.reduce((sum, entry) => sum + entry.amount, 0);
   const totalPayable = totalReceivable;
   const toOptions = USERS.filter((name) => name !== state.selectedUser);
-  const canEditSelected = state.currentUser === "梧桐";
+  const canEditSelected = state.currentUser === state.selectedUser;
 
   elements.totalReceivable.textContent = formatCurrency(totalReceivable);
   elements.totalPayable.textContent = formatCurrency(totalPayable);
@@ -496,7 +490,7 @@ function renderDashboard() {
   elements.selectedBalance.textContent = formatCurrency(selected.balance);
   elements.balanceBadge.textContent = selected.balance >= 0 ? "净应收" : "净应付";
   elements.balanceBadge.classList.toggle("negative", selected.balance < 0);
-  elements.entryNotice.textContent = canEditSelected ? state.syncStatus : `当前为查看模式，只有梧桐可以修改明细数据。${state.syncStatus}`;
+  elements.entryNotice.textContent = canEditSelected ? state.syncStatus : `当前为查看模式，只能修改自己的应收账单。${state.syncStatus}`;
   elements.personPickerButton.disabled = !canEditSelected;
   elements.amount.disabled = !canEditSelected;
   elements.note.disabled = !canEditSelected;
@@ -596,7 +590,7 @@ function renderReceivableGroups(entries) {
   }
 
   return groupEntriesByProject(entries).map((group) => {
-    const canDelete = state.currentUser === "梧桐";
+    const canDelete = group.from === state.currentUser && group.entries.every((entry) => entry.from === state.currentUser);
     const detailRows = group.entries
       .sort((a, b) => a.to.localeCompare(b.to, "zh-CN"))
       .map((entry) => `
@@ -632,7 +626,7 @@ function renderEntries(entries, direction) {
 
   return entries.map((entry) => {
     const counterpart = direction === "to" ? `应收 ${escapeHtml(entry.to)}` : `应付 ${escapeHtml(entry.from)}`;
-    const canDelete = state.currentUser === "梧桐";
+    const canDelete = entry.from === state.currentUser;
 
     return `
       <article class="entry-card">
@@ -686,7 +680,7 @@ function handleLogin(event) {
 async function handleEntrySubmit(event) {
   event.preventDefault();
 
-  if (state.currentUser !== "梧桐") return;
+  if (state.currentUser !== state.selectedUser) return;
 
   const amount = Number(elements.amount.value);
   const note = elements.note.value.trim();
@@ -745,6 +739,9 @@ async function handleEntrySubmit(event) {
 }
 
 async function deleteEntry(id) {
+  const targetEntry = state.entries.find((entry) => entry.id === id);
+  if (!targetEntry || targetEntry.from !== state.currentUser) return;
+
   if (supabaseClient) {
     const { error } = await supabaseClient.from(LEDGER_TABLE).delete().eq("id", id);
     if (error) {
@@ -761,8 +758,10 @@ async function deleteEntry(id) {
 
 async function deleteEntryGroup(groupId) {
   const entryIds = state.entries
-    .filter((entry) => getEntryGroupKey(entry) === groupId)
+    .filter((entry) => getEntryGroupKey(entry) === groupId && entry.from === state.currentUser)
     .map((entry) => entry.id);
+
+  if (!entryIds.length) return;
 
   if (supabaseClient && entryIds.length) {
     const { error } = await supabaseClient.from(LEDGER_TABLE).delete().in("id", entryIds);
